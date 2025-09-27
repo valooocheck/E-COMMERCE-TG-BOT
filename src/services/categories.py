@@ -3,7 +3,19 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
 
-from buttons.buttons import ANSWER_CONFLICT_ADD_CATEGORY, DELETE_CATEGORY, UPDATE_CATEGORY, buttons
+from buttons.buttons import (
+    ANSWER_CONFLICT_ADD_CATEGORY,
+    DELETE_CATEGORY,
+    ERROR_DUPLICATE_NAME,
+    ERROR_EMPTY_NAME,
+    SUCCESS_DELETE_CATEGORY,
+    SUCCESS_UPDATE_CATEGORY,
+    UPDATE_CATEGORY,
+    VERIFY_DELETE_CAT,
+    VERIFY_NAME,
+    VERIFY_UPDATE_CAT,
+    buttons,
+)
 from common.exceptions import Conflict, UpdateDatabaseError
 from db import db_manager
 from db.session_manager import DatabaseSessionManager
@@ -31,9 +43,8 @@ class DeleteCategoryStates(MixinCategoryStates):
 def get_confirm_keyboard(confirm):
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="✅ Подтвердить", callback_data=confirm)],
-            # [InlineKeyboardButton(text="✅ Подтвердить", callback_data="confirm_edit")],
-            [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel")],
+            [InlineKeyboardButton(text=buttons.confirm, callback_data=confirm)],
+            [InlineKeyboardButton(text=buttons.cancel, callback_data="cancel")],
         ]
     )
 
@@ -106,7 +117,7 @@ class CategoriesService:
         if not category:
             return
         await callback.message.answer(
-            f'Действительно хотите удалить категорию "{category.name}"? Подтвердите:',
+            VERIFY_DELETE_CAT % category.name,
             reply_markup=get_confirm_keyboard("confirm_delete"),
         )
         await state.set_state(DeleteCategoryStates.confirming)
@@ -117,9 +128,7 @@ class CategoriesService:
         if not category:
             return
 
-        await callback.message.answer(
-            f"Текущее имя: {category.name}\nВведите новое имя категории:", reply_markup=cancel_keyboard
-        )
+        await callback.message.answer(VERIFY_NAME % category.name, reply_markup=cancel_keyboard)
         await state.set_state(EditCategoryStates.entering_new_name)
         await callback.answer()
         await callback.message.delete()
@@ -127,7 +136,7 @@ class CategoriesService:
     async def enter_new_name(self, message: types.Message, state: FSMContext):
         new_name = message.text.strip()
         if not new_name:
-            await message.answer("Имя не может быть пустым. Попробуйте снова.", reply_markup=cancel_keyboard)
+            await message.answer(ERROR_EMPTY_NAME, reply_markup=cancel_keyboard)
             await state.set_state(EditCategoryStates.entering_new_name)
 
             return
@@ -135,7 +144,8 @@ class CategoriesService:
         await state.update_data(new_name=new_name)
 
         await message.answer(
-            f"Вы хотите изменить на '{new_name}'? Подтвердите:", reply_markup=get_confirm_keyboard("confirm_edit")
+            VERIFY_UPDATE_CAT % new_name,
+            reply_markup=get_confirm_keyboard("confirm_edit"),
         )
         await state.set_state(EditCategoryStates.confirming)
         await message.delete()
@@ -144,7 +154,7 @@ class CategoriesService:
         data = await state.get_data()
         category_id = data["selected_category"]
         await self.table.delete_by_id(db_manager=self.db_manager, record_id=int(category_id))
-        await callback.message.answer("Категория успешно удалена!'. ✅", reply_markup=None)
+        await callback.message.answer(SUCCESS_DELETE_CATEGORY)
         await state.clear()
         await callback.answer()
         await callback.message.delete()
@@ -158,16 +168,16 @@ class CategoriesService:
             new_category = await self.table.update_by_id(
                 db_manager=self.db_manager, record_id=int(category_id), name=new_name
             )
-            await callback.message.answer(f"Категория изменена на '{new_category.name}'. ✅", reply_markup=None)
+            await callback.message.answer(SUCCESS_UPDATE_CATEGORY % new_category.name)
         except Conflict as e:
-            await callback.message.answer(f"Ошибка: {e.args[0]}. Попробуйте другое имя.", reply_markup=None)
+            await callback.message.answer(f"Ошибка: {e.args[0]}. Попробуйте другое имя.")
         except UpdateDatabaseError:
-            await callback.message.answer("Такое имя уже существует. Попробуйте другое имя.", reply_markup=None)
+            await callback.message.answer(ERROR_DUPLICATE_NAME)
             await state.set_state(EditCategoryStates.entering_new_name)
             await callback.answer()
             return
         except Exception as e:
-            await callback.message.answer(f"Неизвестная ошибка: {e}. Попробуйте позже.", reply_markup=None)
+            await callback.message.answer(f"Неизвестная ошибка: {e}. Попробуйте позже.")
 
         await state.clear()
         await callback.answer()
