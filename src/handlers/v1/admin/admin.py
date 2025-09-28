@@ -23,6 +23,7 @@ async def admin(message: types.Message):
     builder.row(types.InlineKeyboardButton(text=buttons.delete_category, callback_data="delete_category"))
     builder.row(types.InlineKeyboardButton(text=buttons.add_product, callback_data="add_product"))
     builder.row(types.InlineKeyboardButton(text=buttons.update_product, callback_data="update_product"))
+    builder.row(types.InlineKeyboardButton(text=buttons.delete_product, callback_data="delete_product"))
     builder.row(types.InlineKeyboardButton(text=buttons.add_admin, callback_data="add_admin"))
 
     await message.answer(ANSWER_ADMIN, reply_markup=builder.as_markup())
