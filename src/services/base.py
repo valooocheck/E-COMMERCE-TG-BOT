@@ -19,10 +19,7 @@ class BaseService:
 
     async def _download_photo(self, message: types.Message):
         try:
-            # Берем последнее (самое высокое качество) фото из массива
             photo = message.photo[-1]
-
-            # Скачиваем фото
             file_info = await message.bot.get_file(photo.file_id)
             downloaded_file = await message.bot.download_file(file_info.file_path)
 
