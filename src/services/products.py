@@ -1,19 +1,28 @@
 from aiogram import types
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State
-from aiogram.types import BufferedInputFile, CallbackQuery
+from aiogram.types import BufferedInputFile, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
 
 from buttons.buttons import (
+    ANSWER_FOR_UPDATE_ATTR,
     CATEGORY_FOR_PRODUCT,
     CHOOSE_CATEGORY_DELETE_PRODUCT,
+    CHOOSE_CATEGORY_UPDATE_PRODUCT,
     CHOOSE_DELETE_PRODUCT,
+    CHOOSE_UPDATE_PRODUCT,
+    CHOOSE_UPDATE_PRODUCT_ATTRIBUTE,
+    ERROR_UPDATE_ATTR,
     PHOTO_FOR_PRODUCT,
     PHOTO_NOT_FOR_PRODUCT,
     PRICE_FOR_PRODUCT,
     SUCCESS_ADD_PRODUCT,
     SUCCESS_DELETE_PRODUCT,
+    UPDATE_PHOTO,
     VERIFY_ADD_PRODUCT,
     VERIFY_DELETE_PRODUCT,
+    VERIFY_UPDATE_CAT,
+    VERIFY_UPDATE_PHOTO,
+    buttons,
 )
 from db import db_manager
 from handlers.v1.admin.admin import cancel_keyboard
@@ -31,6 +40,10 @@ class AddProductStates(MixinStates):
     quantity = State()
 
 
+class UpdateProductStates(MixinStates):
+    value = State()
+
+
 class ProductsService(BaseService):
     @staticmethod
     async def choice_category(message: types.CallbackQuery, state: FSMContext):
@@ -39,7 +52,8 @@ class ProductsService(BaseService):
         await message.answer(CATEGORY_FOR_PRODUCT, reply_markup=keyboard)
         # await state.set_state(AddCategoryStates.waiting_for_name)
 
-    async def select_category_for_add_product(self, callback: types.CallbackQuery, state: FSMContext):
+    @staticmethod
+    async def select_category_for_add_product(callback: types.CallbackQuery, state: FSMContext):
         category = await categories_tg_service._save_record_in_state(callback, state, "category_id")
         if not category:
             return
@@ -58,7 +72,8 @@ class ProductsService(BaseService):
 
         await self.confirmation_add(message, state)
 
-    async def add_price_product(self, message: types.Message, state: FSMContext):
+    @staticmethod
+    async def add_price_product(message: types.Message, state: FSMContext):
         try:
             if price := float(message.text.strip()):
                 await state.update_data(price=price)
@@ -118,11 +133,19 @@ class ProductsService(BaseService):
 
         await state.clear()
 
-    async def delete_product(self, callback: CallbackQuery):
+    @staticmethod
+    async def delete_product(callback: CallbackQuery):
         keyboard = await categories_tg_service._get_records_in_keyboard(
             callback, "delete_select_product_in_category_", "name"
         )
         await callback.message.answer(CHOOSE_CATEGORY_DELETE_PRODUCT, reply_markup=keyboard)
+
+    @staticmethod
+    async def update_product(callback: CallbackQuery):
+        keyboard = await categories_tg_service._get_records_in_keyboard(
+            callback, "update_select_product_in_category_", "name"
+        )
+        await callback.message.answer(CHOOSE_CATEGORY_UPDATE_PRODUCT, reply_markup=keyboard)
 
     async def select_category_for_delete_product(self, callback: CallbackQuery, state: FSMContext):
         category = await self._save_record_in_state(callback, state, "category_id")
@@ -133,6 +156,19 @@ class ProductsService(BaseService):
         )
         await callback.message.answer(
             CHOOSE_DELETE_PRODUCT,
+            reply_markup=keyboard,
+        )
+        await callback.message.delete()
+
+    async def select_category_for_update_product(self, callback: CallbackQuery, state: FSMContext):
+        category = await categories_tg_service._save_record_in_state(callback, state, "category_id")
+        if not category:
+            return
+        keyboard = await self._get_records_in_keyboard(
+            callback, "select_product_in_category_update_", "name", self.table.category_id == category.id
+        )
+        await callback.message.answer(
+            CHOOSE_UPDATE_PRODUCT,
             reply_markup=keyboard,
         )
         await callback.message.delete()
@@ -155,6 +191,97 @@ class ProductsService(BaseService):
             reply_markup=get_confirm_keyboard("confirm_delete_product"),
         )
         await callback.message.delete()
+
+    async def select_product_for_update(self, callback: CallbackQuery, state: FSMContext):
+        product = await self._save_record_in_state(callback, state, "product_id")
+        if not product:
+            return
+        card = await self.gen_product_card(product.name, product.description, product.price, product.category_id)
+        photo_file = BufferedInputFile(product.photo, filename="product.jpg")
+
+        await callback.message.answer_photo(
+            photo=photo_file,
+            caption=card,
+            parse_mode="HTML",
+        )
+        column_names = {
+            "name": "Имя товара",
+            "description": "Описание",
+            "price": "цена",
+            "photo": "фото",
+            "quantity": "Количество",
+            "category_id": "Категория",
+        }
+
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[])
+
+        for k, v in column_names.items():
+            keyboard.inline_keyboard.append(
+                [
+                    InlineKeyboardButton(
+                        text=v,
+                        callback_data="product_attr_name_for_update_" + k,
+                    )
+                ]
+            )
+        keyboard.inline_keyboard.append([InlineKeyboardButton(text=buttons.cancel, callback_data="cancel")])
+
+        await callback.message.answer(
+            CHOOSE_UPDATE_PRODUCT_ATTRIBUTE,
+            reply_markup=keyboard,
+        )
+        await callback.message.delete()
+
+    async def product_attr_name_for_update(self, callback: types.CallbackQuery, state: FSMContext):
+        name_attr = callback.data.split("_")[-1]
+        await state.update_data({"name_attr": name_attr})
+        data = await state.get_data()
+        product = await self.table.find_by_id(self.db_manager, int(data["product_id"]))
+        if name_attr in ["name", "description", "price", "quantity"]:
+            await callback.message.answer(
+                ANSWER_FOR_UPDATE_ATTR % str(getattr(product, name_attr)), reply_markup=cancel_keyboard
+            )
+            await callback.message.delete()
+            await state.set_state(UpdateProductStates.value)
+        elif name_attr == "photo":
+            await callback.message.answer(UPDATE_PHOTO, reply_markup=cancel_keyboard)
+            await callback.message.delete()
+            await state.set_state(UpdateProductStates.value)
+
+    async def update_photo_product(self, message: types.Message, state: FSMContext):
+        if not message.photo:
+            await message.answer(PHOTO_NOT_FOR_PRODUCT, reply_markup=cancel_keyboard)
+            await state.set_state(UpdateProductStates.value)
+            return
+
+        photo = await self._download_photo(message)
+
+        await state.update_data(value=photo.read())
+
+    async def update_attr(self, message: types.Message, state: FSMContext):
+        data = await state.get_data()
+        if data["name_attr"] in ["name", "description", "price", "quantity"]:
+            value = message.text.strip()
+            if not value:
+                await message.answer(ERROR_UPDATE_ATTR, reply_markup=cancel_keyboard)
+                await state.set_state(UpdateProductStates.value)
+                return
+
+            await state.update_data(value=value)
+            await message.answer(
+                VERIFY_UPDATE_CAT % value,
+                reply_markup=get_confirm_keyboard("confirm_update_product"),
+            )
+        elif data["name_attr"] == "photo":
+            await self.update_photo_product(message, state)
+            await message.answer(
+                VERIFY_UPDATE_PHOTO,
+                reply_markup=get_confirm_keyboard("confirm_update_product"),
+            )
+        elif data["name_attr"] == "category_id":
+            pass
+        await state.set_state(UpdateProductStates.confirming)
+        # await message.delete()
 
     async def confirmation_delete_product(self, callback: CallbackQuery, state: FSMContext):
         await callback.message.delete()
