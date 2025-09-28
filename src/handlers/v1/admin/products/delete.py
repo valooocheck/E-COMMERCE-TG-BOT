@@ -13,7 +13,7 @@ async def delete_product(callback: types.CallbackQuery):
 
 @router.callback_query(F.data.startswith("delete_select_product_in_category_"))
 async def select_category(callback: types.CallbackQuery, state: FSMContext):
-    await products_tg_service.select_category_for_delete_product(callback, state)
+    await products_tg_service.select_category_for_update_product(callback, state)
 
 
 @router.callback_query(F.data.startswith("select_product_in_category_delete_"))
@@ -21,8 +21,6 @@ async def select_product_for_delete(callback: types.CallbackQuery, state: FSMCon
     await products_tg_service.select_product_for_delete(callback, state)
 
 
-@router.callback_query(
-    F.data == "confirm_delete_product",
-)
+@router.callback_query(F.data == "confirm_delete_product")
 async def confirm_delete(callback: types.CallbackQuery, state: FSMContext):
     await products_tg_service.confirmation_delete_product(callback, state)
