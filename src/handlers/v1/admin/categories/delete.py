@@ -7,7 +7,7 @@ router = Router()
 
 
 @router.callback_query(F.data == "delete_category")
-async def update_category(callback: types.CallbackQuery, state: FSMContext):
+async def delete_category(callback: types.CallbackQuery, state: FSMContext):
     await categories_tg_service.delete_category(callback, state)
 
 
