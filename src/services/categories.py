@@ -4,7 +4,6 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
 
 from buttons.buttons import (
-    ANSWER_CONFLICT_ADD_CATEGORY,
     DELETE_CATEGORY,
     ERROR_DUPLICATE_NAME,
     ERROR_EMPTY_NAME,
@@ -18,17 +17,16 @@ from buttons.buttons import (
 )
 from common.exceptions import Conflict, UpdateDatabaseError
 from db import db_manager
-from db.session_manager import DatabaseSessionManager
 from handlers.v1.admin.admin import cancel_keyboard
 from models.models import CategoriesOrm
+from services.base import BaseService, MixinStates
 
 
-class MixinCategoryStates(StatesGroup):
-    confirming = State()
+class MixinCategoryStates(MixinStates):
     selecting_category = State()
 
 
-class AddProductStates(StatesGroup):
+class AddCategoryStates(StatesGroup):
     waiting_for_name = State()
 
 
@@ -49,71 +47,21 @@ def get_confirm_keyboard(confirm):
     )
 
 
-class CategoriesService:
-    def __init__(self, db_man: DatabaseSessionManager, table) -> None:
-        self.db_manager = db_man
-        self.table = table
-
-    async def add(self, data):
-        new_record = self.table(name=data)
-        try:
-            await new_record.save(self.db_manager)
-        except Conflict:
-            raise Conflict(ANSWER_CONFLICT_ADD_CATEGORY % data) from None
-        return new_record
-
-    async def _get_all(self):
-        return await self.table.find_all(self.db_manager)
-
-    async def _get_category_in_keyboard(self, callback: CallbackQuery, callback_data: str):
-        categories = await self._get_all()
-
-        if not categories:
-            await callback.message.answer("Категории не найдены. 😔")
-            await callback.answer()
-            return
-
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[])
-
-        for category in categories:
-            keyboard.inline_keyboard.append(
-                [
-                    InlineKeyboardButton(
-                        text=category.name,
-                        callback_data=f"{callback_data}{category.id}",
-                    )
-                ]
-            )
-
-        keyboard.inline_keyboard.append([InlineKeyboardButton(text=buttons.cancel, callback_data="cancel")])
-        return keyboard
-
+class CategoriesService(BaseService):
     async def delete_category(self, callback: CallbackQuery, state: FSMContext):
-        keyboard = await self._get_category_in_keyboard(callback, "delete_select_category_")
+        keyboard = await self._get_records_in_keyboard(callback, "delete_select_category_", "name")
 
         await callback.message.answer(DELETE_CATEGORY, reply_markup=keyboard)
         await callback.answer()
 
     async def update_category(self, callback: CallbackQuery, state: FSMContext):
-        keyboard = await self._get_category_in_keyboard(callback, "select_category_")
+        keyboard = await self._get_records_in_keyboard(callback, "select_category_", "name")
 
         await callback.message.answer(UPDATE_CATEGORY, reply_markup=keyboard)
-        # await state.set_state(AddProductStates.waiting_for_name)
         await callback.answer()
 
-    async def _save_record_in_state(self, callback: CallbackQuery, state: FSMContext):
-        category_id = callback.data.split("_")[-1]
-
-        category = await self.table.find_by_id(self.db_manager, int(category_id))
-        if not category:
-            await callback.message.answer("Категория не найдена. 😔")
-            await callback.answer()
-
-        await state.update_data(selected_category=category.id)
-        return category
-
     async def select_category_for_delete(self, callback: CallbackQuery, state: FSMContext):
-        category = await self._save_record_in_state(callback, state)
+        category = await self._save_record_in_state(callback, state, "selected_category")
         if not category:
             return
         await callback.message.answer(
@@ -124,7 +72,7 @@ class CategoriesService:
         await callback.message.delete()
 
     async def select_category_for_update(self, callback: CallbackQuery, state: FSMContext):
-        category = await self._save_record_in_state(callback, state)
+        category = await self._save_record_in_state(callback, state, "selected_category")
         if not category:
             return
 
