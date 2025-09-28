@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from models.models import Base
+from models.base import Base
 
 
 class DatabaseSessionManager:
