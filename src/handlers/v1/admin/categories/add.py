@@ -2,6 +2,7 @@ from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 
 from buttons.buttons import ANSWER_ADD_CATEGORY, NAME_ADD_CATEGORY
+from common.decorators import db_interaction
 from common.exceptions import Conflict
 from handlers.v1.admin.admin import cancel_keyboard
 from services.categories import AddCategoryStates, categories_tg_service
@@ -10,6 +11,7 @@ router = Router()
 
 
 @router.callback_query(F.data == "add_category")
+@db_interaction.check_admin
 async def add_category(callback: types.CallbackQuery, state: FSMContext):
     await callback.message.answer(NAME_ADD_CATEGORY, reply_markup=cancel_keyboard)
     await state.set_state(AddCategoryStates.waiting_for_name)
@@ -18,6 +20,7 @@ async def add_category(callback: types.CallbackQuery, state: FSMContext):
 
 
 @router.message(AddCategoryStates.waiting_for_name)
+@db_interaction.check_admin
 async def add_name_category(message: types.Message, state: FSMContext):
     try:
         name = message.text.strip()

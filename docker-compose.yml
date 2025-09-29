@@ -11,7 +11,6 @@ services:
       target: server
       args:
         PROJECT_DIR: ${PROJECT_DIR:-/app}
-        SERVICE_PORT: ${API_PORT:-8000}
         REQUIREMENTS_FILE: ./requirements.txt
     depends_on:
       tg_postgres:

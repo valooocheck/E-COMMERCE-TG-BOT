@@ -4,6 +4,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from buttons.buttons import ANSWER_ADMIN, ANSWER_CANCEL, buttons
+from common.decorators import db_interaction
 
 router = Router()
 
@@ -14,7 +15,7 @@ cancel_keyboard = types.InlineKeyboardMarkup(
 
 
 @router.message(Command("admin"))
-# @db_interaction.check_admin
+@db_interaction.check_admin
 async def admin(message: types.Message):
     builder = InlineKeyboardBuilder()
 
