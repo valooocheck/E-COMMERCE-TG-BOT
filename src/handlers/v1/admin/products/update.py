@@ -31,7 +31,11 @@ async def update_attr(message: types.Message, state: FSMContext):
     await products_tg_service.update_attr(message, state)
 
 
+@router.callback_query(F.data.startswith("category_in_product_for_update_"))
+async def product_attr_name_for_update(callback: types.CallbackQuery, state: FSMContext):
+    await products_tg_service.select_category_in_product_for_update(callback, state)
+
+
 @router.callback_query(F.data == "confirm_update_product")
-async def confirm_delete(callback: types.CallbackQuery, state: FSMContext):
-    # await products_tg_service.confirmation_delete_product(callback, state)
-    await callback.message.answer("Подтверждение получено")
+async def confirmation_update(callback: types.CallbackQuery, state: FSMContext):
+    await products_tg_service.confirmation_update(callback, state)

@@ -47,6 +47,9 @@ ANSWER_FOR_UPDATE_ATTR = "Текущее значение: %s\nВведите н
 ERROR_UPDATE_ATTR = "Что-то пошло не так, отправь сообщение еще раз!"
 UPDATE_PHOTO = "Пришлите новое фото для товара"
 VERIFY_UPDATE_PHOTO = "Вы действительно хотите изменить фото? Подтвердите:"
+SUCCESS_UPDATE_PRODUCT = "Товар успешно обновлен!"
+CHOOSE_CATEGORY_FOR_UPDATE_PRODUCT = "Выберите какую категорию вы хотите установить у товара!"
+VERIFY_UPDATE_CAT_IN_PROD = 'Вы действительно хотите изменить категорию на "%s"? Подтвердите:'
 
 
 class Buttons(BaseModel):

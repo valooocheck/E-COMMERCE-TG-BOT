@@ -2,11 +2,13 @@ from aiogram import types
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State
 from aiogram.types import BufferedInputFile, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
+from sqlalchemy import select
 
 from buttons.buttons import (
     ANSWER_FOR_UPDATE_ATTR,
     CATEGORY_FOR_PRODUCT,
     CHOOSE_CATEGORY_DELETE_PRODUCT,
+    CHOOSE_CATEGORY_FOR_UPDATE_PRODUCT,
     CHOOSE_CATEGORY_UPDATE_PRODUCT,
     CHOOSE_DELETE_PRODUCT,
     CHOOSE_UPDATE_PRODUCT,
@@ -17,16 +19,18 @@ from buttons.buttons import (
     PRICE_FOR_PRODUCT,
     SUCCESS_ADD_PRODUCT,
     SUCCESS_DELETE_PRODUCT,
+    SUCCESS_UPDATE_PRODUCT,
     UPDATE_PHOTO,
     VERIFY_ADD_PRODUCT,
     VERIFY_DELETE_PRODUCT,
     VERIFY_UPDATE_CAT,
+    VERIFY_UPDATE_CAT_IN_PROD,
     VERIFY_UPDATE_PHOTO,
     buttons,
 )
 from db import db_manager
 from handlers.v1.admin.admin import cancel_keyboard
-from models.models import ProductsOrm
+from models.models import CategoriesOrm, ProductsOrm
 from services.base import BaseService, MixinStates
 from services.categories import categories_tg_service, get_confirm_keyboard
 
@@ -85,9 +89,9 @@ class ProductsService(BaseService):
             return
 
     @staticmethod
-    async def gen_product_card(name: str, description: str, price: float, category_id: int):
+    async def gen_product_card(name: str, description: str, price: float, category_id: int, quantity: int):
         category = await categories_tg_service._get_by_id(category_id)
-        return f"Название товара: {name} \nЦена: {price}₽ \nОписание: {description}\nКатегория: {category.name}"
+        return f"Название товара: {name} \nЦена: {price}₽ \nОписание: {description}\nКатегория: {category.name}\nКоличество: {quantity}"
 
     async def confirmation_add(self, message: types.Message, state: FSMContext):
         data = await state.get_data()
@@ -96,8 +100,9 @@ class ProductsService(BaseService):
         description = data.get("description")
         price = data.get("price")
         photo_bytes = data.get("photo")
+        quantity = data.get("quantity")
 
-        card_prod = await self.gen_product_card(name, description, price, category_id)
+        card_prod = await self.gen_product_card(name, description, price, category_id, quantity)
 
         photo_file = BufferedInputFile(photo_bytes, filename="product.jpg")
 
@@ -164,20 +169,24 @@ class ProductsService(BaseService):
         category = await categories_tg_service._save_record_in_state(callback, state, "category_id")
         if not category:
             return
+        where_conditions = [self.table.category_id == category.id]
         keyboard = await self._get_records_in_keyboard(
-            callback, "select_product_in_category_update_", "name", self.table.category_id == category.id
+            callback, "select_product_in_category_update_", "name", where_conditions
         )
-        await callback.message.answer(
-            CHOOSE_UPDATE_PRODUCT,
-            reply_markup=keyboard,
-        )
-        await callback.message.delete()
+        if keyboard:
+            await callback.message.answer(
+                CHOOSE_UPDATE_PRODUCT,
+                reply_markup=keyboard,
+            )
+            await callback.message.delete()
 
     async def select_product_for_delete(self, callback: CallbackQuery, state: FSMContext):
         product = await self._save_record_in_state(callback, state, "product_id")
         if not product:
             return
-        card = await self.gen_product_card(product.name, product.description, product.price, product.category_id)
+        card = await self.gen_product_card(
+            product.name, product.description, product.price, product.category_id, product.quantity
+        )
         photo_file = BufferedInputFile(product.photo, filename="product.jpg")
 
         await callback.message.answer_photo(
@@ -196,7 +205,9 @@ class ProductsService(BaseService):
         product = await self._save_record_in_state(callback, state, "product_id")
         if not product:
             return
-        card = await self.gen_product_card(product.name, product.description, product.price, product.category_id)
+        card = await self.gen_product_card(
+            product.name, product.description, product.price, product.category_id, product.quantity
+        )
         photo_file = BufferedInputFile(product.photo, filename="product.jpg")
 
         await callback.message.answer_photo(
@@ -210,7 +221,7 @@ class ProductsService(BaseService):
             "price": "цена",
             "photo": "фото",
             "quantity": "Количество",
-            "category_id": "Категория",
+            "category": "Категория",
         }
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[])
@@ -237,16 +248,25 @@ class ProductsService(BaseService):
         await state.update_data({"name_attr": name_attr})
         data = await state.get_data()
         product = await self.table.find_by_id(self.db_manager, int(data["product_id"]))
-        if name_attr in ["name", "description", "price", "quantity"]:
+        if name_attr == "category":
+            keyboard = await categories_tg_service._get_records_in_keyboard(
+                callback, "category_in_product_for_update_", "name"
+            )
+            if keyboard:
+                await callback.message.answer(
+                    CHOOSE_CATEGORY_FOR_UPDATE_PRODUCT,
+                    reply_markup=keyboard,
+                )
+                await callback.message.delete()
+                return
+        elif name_attr in ["name", "description", "price", "quantity"]:
             await callback.message.answer(
                 ANSWER_FOR_UPDATE_ATTR % str(getattr(product, name_attr)), reply_markup=cancel_keyboard
             )
-            await callback.message.delete()
-            await state.set_state(UpdateProductStates.value)
         elif name_attr == "photo":
             await callback.message.answer(UPDATE_PHOTO, reply_markup=cancel_keyboard)
-            await callback.message.delete()
-            await state.set_state(UpdateProductStates.value)
+        await callback.message.delete()
+        await state.set_state(UpdateProductStates.value)
 
     async def update_photo_product(self, message: types.Message, state: FSMContext):
         if not message.photo:
@@ -260,7 +280,9 @@ class ProductsService(BaseService):
 
     async def update_attr(self, message: types.Message, state: FSMContext):
         data = await state.get_data()
-        if data["name_attr"] in ["name", "description", "price", "quantity"]:
+        if data["name_attr"] == "category":
+            pass
+        elif data["name_attr"] in ["name", "description", "price", "quantity"]:
             value = message.text.strip()
             if not value:
                 await message.answer(ERROR_UPDATE_ATTR, reply_markup=cancel_keyboard)
@@ -278,16 +300,54 @@ class ProductsService(BaseService):
                 VERIFY_UPDATE_PHOTO,
                 reply_markup=get_confirm_keyboard("confirm_update_product"),
             )
-        elif data["name_attr"] == "category_id":
-            pass
         await state.set_state(UpdateProductStates.confirming)
-        # await message.delete()
 
     async def confirmation_delete_product(self, callback: CallbackQuery, state: FSMContext):
         await callback.message.delete()
         data = await state.get_data()
         await self.table.delete_by_id(self.db_manager, int(data.get("product_id")))
         await callback.message.answer(SUCCESS_DELETE_PRODUCT)
+
+        await state.clear()
+
+    async def select_category_in_product_for_update(self, callback: types.CallbackQuery, state: FSMContext):
+        cat = await categories_tg_service._save_record_in_state(callback, state, "value")
+        await callback.message.answer(
+            VERIFY_UPDATE_CAT_IN_PROD % cat.name,
+            reply_markup=get_confirm_keyboard("confirm_update_product"),
+        )
+        await state.set_state(UpdateProductStates.confirming)
+
+    async def _update_product(self, state: FSMContext):
+        data = await state.get_data()
+        if data["name_attr"] == "category":
+            async with db_manager.session() as session:
+                query = select(CategoriesOrm).where(CategoriesOrm.id == int(data.get("value")))
+                result = await session.execute(query)
+                category = result.scalar_one_or_none()
+
+                query = select(ProductsOrm).where(ProductsOrm.id == int(data.get("product_id")))
+                result = await session.execute(query)
+                result = result.scalar_one_or_none()
+                result.category = category
+                await session.commit()
+                return result
+        elif data["name_attr"] == "price":
+            data["value"] = float(data["value"])
+        elif data["name_attr"] == "quantity":
+            data["value"] = int(data["value"])
+        product = await self.table.update_by_id(
+            db_manager=self.db_manager,
+            record_id=int(data.get("product_id")),
+            **{data.get("name_attr"): data.get("value")},
+        )
+
+        return product
+
+    async def confirmation_update(self, callback: types.CallbackQuery, state: FSMContext):
+        await callback.message.delete()
+        await self._update_product(state)
+        await callback.message.answer(SUCCESS_UPDATE_PRODUCT)
 
         await state.clear()
 
