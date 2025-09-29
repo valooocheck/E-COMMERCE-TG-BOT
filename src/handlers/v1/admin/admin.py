@@ -5,13 +5,9 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from buttons.buttons import ANSWER_ADMIN, ANSWER_CANCEL, buttons
 from common.decorators import db_interaction
+from services.admin import AddAdminStates, admin_service
 
 router = Router()
-
-
-cancel_keyboard = types.InlineKeyboardMarkup(
-    inline_keyboard=[[types.InlineKeyboardButton(text=buttons.cancel, callback_data="cancel")]]
-)
 
 
 @router.message(Command("admin"))
@@ -28,6 +24,18 @@ async def admin(message: types.Message):
     builder.row(types.InlineKeyboardButton(text=buttons.add_admin, callback_data="add_admin"))
 
     await message.answer(ANSWER_ADMIN, reply_markup=builder.as_markup())
+
+
+@router.callback_query(F.data == "add_admin")
+@db_interaction.check_admin
+async def add_admin(callback: types.CallbackQuery, state: FSMContext):
+    await admin_service.add_admin(callback, state)
+
+
+@router.message(AddAdminStates.name)
+@db_interaction.check_admin
+async def add_admin_name(message: types.Message, state: FSMContext):
+    await admin_service.add_admin_name(message, state)
 
 
 @router.callback_query(F.data == "cancel")

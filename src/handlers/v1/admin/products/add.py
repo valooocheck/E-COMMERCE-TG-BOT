@@ -3,7 +3,7 @@ from aiogram.fsm.context import FSMContext
 
 from buttons.buttons import DESCRIPTION_ADD_PRODUCT, NAME_ADD_PRODUCT
 from common.decorators import db_interaction
-from handlers.v1.admin.admin import cancel_keyboard
+from services.admin import cancel_keyboard
 from services.products import AddProductStates, products_tg_service
 
 router = Router()

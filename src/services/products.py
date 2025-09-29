@@ -29,8 +29,8 @@ from buttons.buttons import (
     buttons,
 )
 from db import db_manager
-from handlers.v1.admin.admin import cancel_keyboard
 from models.models import CategoriesOrm, ProductsOrm
+from services.admin import cancel_keyboard
 from services.base import BaseService, MixinStates
 from services.categories import categories_tg_service, get_confirm_keyboard
 
