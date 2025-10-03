@@ -1,0 +1,44 @@
+[tool.ruff]
+line-length = 120
+
+exclude = [
+    "tests/",
+    "migrations/",
+    "**/migrations/",
+    "build/",
+    "dist/",
+    "env/",
+    ".git/",
+    "*.pyc",
+    "__pycache__/"
+]
+
+output-format = "full"
+
+[tool.ruff.format]
+docstring-code-format = true
+docstring-code-line-length = 120
+quote-style = "double"
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+
+[tool.ruff.lint.flake8-quotes]
+docstring-quotes = "double"
+
+[tool.ruff.lint]
+select = [
+    "E", # all error codes
+    "F", # all formatting codes
+    "W", # all warning codes
+    "I", # all informational codes
+    "B", # all bugbear codes
+    "C4", # all complexity codes
+]
+
+ignore = [
+    "E501", # line length errors
+    "C901", # cyclomatic complexity errors
+    "B008", # errors related to specific bugbear codes
+    "W191", # indentation errors (tabs vs spaces)
+]

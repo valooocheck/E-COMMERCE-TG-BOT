@@ -1,0 +1,43 @@
+services:
+  bot-service:
+    container_name: bot-service
+    build:
+      context: .
+      dockerfile: docker/e-commerce-tg-bot/Dockerfile
+      target: server
+      args:
+        PROJECT_DIR: ${PROJECT_DIR:-/app}
+        REQUIREMENTS_FILE: ./requirements.txt
+    depends_on:
+      tg_postgres:
+        condition: service_healthy
+    env_file:
+      - ./.env
+
+
+  tg_postgres:
+    image: postgres:16
+    container_name: tg_postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-tg_db}
+      PGUSER: ${POSTGRES_USER:-postgres}
+      PGDATABASE: ${POSTGRES_DB:-tg_db}
+      PGDATA: "/var/lib/postgresql/data/pgdata"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready", "-d", "telegram_bot_db" ]
+      interval: 30s
+      timeout: 60s
+      retries: 5
+      start_period: 80s
+    volumes:
+      - tg-data:/var/lib/postgresql/data
+    expose:
+      - 5432
+    env_file:
+      - ./.env
+
+
+volumes:
+  tg-data: { }

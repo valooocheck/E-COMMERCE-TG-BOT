@@ -1,0 +1,35 @@
+from aiogram import F, Router, types
+from aiogram.fsm.context import FSMContext
+
+from buttons.buttons import ANSWER_ADD_CATEGORY, NAME_ADD_CATEGORY
+from common.decorators import db_interaction
+from common.exceptions import Conflict
+from services.admin import cancel_keyboard
+from services.categories import AddCategoryStates, categories_tg_service
+
+router = Router()
+
+
+@router.callback_query(F.data == "add_category")
+@db_interaction.check_admin
+async def add_category(callback: types.CallbackQuery, state: FSMContext):
+    await callback.message.answer(NAME_ADD_CATEGORY, reply_markup=cancel_keyboard)
+    await state.set_state(AddCategoryStates.waiting_for_name)
+
+    await callback.answer()
+
+
+@router.message(AddCategoryStates.waiting_for_name)
+@db_interaction.check_admin
+async def add_name_category(message: types.Message, state: FSMContext):
+    try:
+        name = message.text.strip()
+        new_catalog = await categories_tg_service.add(name)
+        await message.answer(ANSWER_ADD_CATEGORY % new_catalog.name)
+        await state.clear()
+    except Conflict as e:
+        await message.answer(e.args[0])
+        await state.clear()
+    except Exception as e:
+        await message.answer(f"Ошибка: {e}. Попробуйте снова.")
+        await state.clear()
