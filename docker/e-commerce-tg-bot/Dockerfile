@@ -11,8 +11,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 FROM base AS builder
 
 RUN apt-get update && \
+    apt-get install -y build-essential git gcc libffi-dev netcat-traditional tzdata gettext libpq-dev libmagic1 && \
+    apt-get clean && \
     rm -rf /var/lib/apt/lists/*
-
 
 FROM builder AS python-env
 ARG REQUIREMENTS_FILE=requirements.txt
