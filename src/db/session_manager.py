@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from core.config import config
 from models.base import Base
 
 
@@ -31,7 +32,7 @@ class DatabaseSessionManager:
             connect_args = {}
         self._engine = create_async_engine(
             url=db_url,
-            echo=True,
+            echo=config.telegram_bot.debug,
             pool_pre_ping=True,
             connect_args=connect_args,
         )
