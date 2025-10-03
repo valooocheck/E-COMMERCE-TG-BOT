@@ -1,0 +1,11 @@
+.env.sample
+.env
+pyproject.toml
+.github/
+.git/
+*.log
+tmp/
+log/
+README.md
+docker-compose.local.yml
+.gitignore
