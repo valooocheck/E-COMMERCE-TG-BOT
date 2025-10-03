@@ -1,9 +1,7 @@
 FROM python:3.12.11-slim AS base
 
-
 ARG PROJECT_DIR=/opt/app
 ARG PYTHON_VENV=/opt/.venv
-
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

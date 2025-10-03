@@ -1,13 +1,9 @@
-networks:
-  telegram-bot-network:
-    external: true
-
 services:
   bot-service:
     container_name: bot-service
     build:
       context: .
-      dockerfile: docker/bot-service/Dockerfile
+      dockerfile: docker/e-commerce-tg-bot/Dockerfile
       target: server
       args:
         PROJECT_DIR: ${PROJECT_DIR:-/app}
@@ -15,8 +11,6 @@ services:
     depends_on:
       tg_postgres:
         condition: service_healthy
-    networks:
-      - telegram-bot-network
     env_file:
       - ./.env
 
@@ -43,9 +37,6 @@ services:
       - 5432
     env_file:
       - ./.env
-    networks:
-      - telegram-bot-network
-
 
 
 volumes:
