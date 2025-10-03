@@ -10,7 +10,6 @@ from handlers import routers
 
 async def main():
     db_manager.init(config.postgres.dsn)
-    # await db_manager.create_tables()
     bot = Bot(token=config.telegram_bot.token.get_secret_value())
     dp = Dispatcher()
 
