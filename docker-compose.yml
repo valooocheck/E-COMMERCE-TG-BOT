@@ -1,6 +1,6 @@
 services:
-  bot-service:
-    container_name: bot-service
+  bot-service-test:
+    container_name:  bot-service-test
     build:
       context: .
       dockerfile: docker/e-commerce-tg-bot/Dockerfile
