@@ -15,4 +15,4 @@ async def admin(message: types.Message):
     builder.row(types.InlineKeyboardButton(text=buttons.show_catalog, callback_data="show_catalog"))
     builder.row(types.InlineKeyboardButton(text=buttons.show_cart, callback_data="show_cart"))
     builder.row(types.InlineKeyboardButton(text=buttons.show_orders, callback_data="show_orders"))
-    await message.answer(HELLO_CLIENT % message.from_user.username, reply_markup=builder.as_markup())
+    await message.answer(HELLO_CLIENT, reply_markup=builder.as_markup())
