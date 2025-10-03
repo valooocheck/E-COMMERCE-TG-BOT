@@ -40,7 +40,9 @@ class BaseService:
         return new_record
 
     async def _get_all(self, where_conditions=None):
-        return await self.table.find_all(self.db_manager, where_conditions=where_conditions)
+        if where_conditions:
+            where_conditions = list(where_conditions)
+        return await self.table.find_all(db_manager=self.db_manager, where_conditions=where_conditions)
 
     async def _get_records_in_keyboard(
         self, callback: types.CallbackQuery | types.Message, callback_data: str, name_attr: str, conditions=None

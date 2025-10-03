@@ -5,12 +5,17 @@ from aiogram.types import BufferedInputFile, CallbackQuery, InlineKeyboardButton
 from sqlalchemy import select
 
 from buttons.buttons import (
+    ANSWER_ADMIN_ERROR_PRICE,
     ANSWER_FOR_UPDATE_ATTR,
+    ANSWER_NOT_PRODUCT,
+    CARD_TEMPLATE,
+    CATEGORY_CHOOSE,
     CATEGORY_FOR_PRODUCT,
     CHOOSE_CATEGORY_DELETE_PRODUCT,
     CHOOSE_CATEGORY_FOR_UPDATE_PRODUCT,
     CHOOSE_CATEGORY_UPDATE_PRODUCT,
     CHOOSE_DELETE_PRODUCT,
+    CHOOSE_PRODUCT,
     CHOOSE_UPDATE_PRODUCT,
     CHOOSE_UPDATE_PRODUCT_ATTRIBUTE,
     ERROR_UPDATE_ATTR,
@@ -52,9 +57,8 @@ class ProductsService(BaseService):
     @staticmethod
     async def choice_category(message: types.CallbackQuery, state: FSMContext):
         keyboard = await categories_tg_service._get_records_in_keyboard(message, "category_for_add_product_", "name")
-
-        await message.answer(CATEGORY_FOR_PRODUCT, reply_markup=keyboard)
-        # await state.set_state(AddCategoryStates.waiting_for_name)
+        if keyboard:
+            await message.answer(CATEGORY_FOR_PRODUCT, reply_markup=keyboard)
 
     @staticmethod
     async def select_category_for_add_product(callback: types.CallbackQuery, state: FSMContext):
@@ -79,19 +83,20 @@ class ProductsService(BaseService):
     @staticmethod
     async def add_price_product(message: types.Message, state: FSMContext):
         try:
-            if price := float(message.text.strip()):
+            if price := int(message.text.strip()):
                 await state.update_data(price=price)
-                # await state.set_state(AddProductStates.confirming)
                 await message.answer(PHOTO_FOR_PRODUCT, reply_markup=cancel_keyboard)
                 await state.set_state(AddProductStates.photo)
-        except Exception as e:
-            await message.answer(e)
+        except Exception:
+            await message.answer(ANSWER_ADMIN_ERROR_PRICE, reply_markup=cancel_keyboard)
+            await state.set_state(AddProductStates.price)
             return
 
     @staticmethod
-    async def gen_product_card(name: str, description: str, price: float, category_id: int, quantity: int):
+    async def gen_product_card(name: str, description: str, price: int, category_id: int, quantity: int):
         category = await categories_tg_service._get_by_id(category_id)
-        return f"Название товара: {name} \nЦена: {price}₽ \nОписание: {description}\nКатегория: {category.name}\nКоличество: {quantity}"
+        # return f"Название товара: {name} \nЦена: {price}₽ \nОписание: {description}\nКатегория: {category.name}\nКоличество: {quantity}"
+        return CARD_TEMPLATE % (str(name), str(price), str(description), str(category.name), str(quantity))
 
     async def confirmation_add(self, message: types.Message, state: FSMContext):
         data = await state.get_data()
@@ -122,11 +127,7 @@ class ProductsService(BaseService):
     async def _add_product(self, state: FSMContext):
         data = await state.get_data()
         product = self.table(
-            name=data.get("name"),
-            description=data.get("description"),
-            price=data.get("price"),
-            photo=data.get("photo"),
-            quantity=52,
+            name=data.get("name"), description=data.get("description"), price=data.get("price"), photo=data.get("photo")
         )
         product.category = await categories_tg_service._get_by_id(data.get("category_id"))
         await product.save(self.db_manager)
@@ -333,7 +334,7 @@ class ProductsService(BaseService):
                 await session.commit()
                 return result
         elif data["name_attr"] == "price":
-            data["value"] = float(data["value"])
+            data["value"] = int(data["value"])
         elif data["name_attr"] == "quantity":
             data["value"] = int(data["value"])
         product = await self.table.update_by_id(
@@ -350,6 +351,67 @@ class ProductsService(BaseService):
         await callback.message.answer(SUCCESS_UPDATE_PRODUCT)
 
         await state.clear()
+
+    @staticmethod
+    async def show_catalog(callback: types.CallbackQuery):
+        keyboard = await categories_tg_service._get_records_in_keyboard(callback, "catalog_categories_", "name")
+        if keyboard:
+            await callback.message.answer(CATEGORY_CHOOSE, reply_markup=keyboard)
+            await callback.answer()
+
+    async def select_category_show_product(self, callback: types.CallbackQuery, state: FSMContext):
+        cat_id = callback.data.split("_")[-1]
+
+        keyboard = await self._get_records_in_keyboard(
+            callback, "catalog_product_", "name", [self.table.category_id == int(cat_id)]
+        )
+        await callback.message.answer(
+            CHOOSE_PRODUCT,
+            reply_markup=keyboard,
+        )
+        await callback.answer()
+
+    async def catalog_product(self, callback: types.CallbackQuery, state: FSMContext):
+        prod_id = callback.data.split("_")[-1]
+        product = await self.table.find_by_id(db_manager=self.db_manager, record_id=int(prod_id))
+        if not product:
+            await callback.message.answer(ANSWER_NOT_PRODUCT)
+            return await callback.answer()
+        card = await self.gen_product_card(
+            product.name, product.description, product.price, product.category_id, product.quantity
+        )
+        photo_file = BufferedInputFile(product.photo, filename="product.jpg")
+
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text=buttons.next_product,
+                        callback_data=f"catalog_product_{int(prod_id) + 1}",
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        text=buttons.previous_product,
+                        callback_data=f"catalog_product_{int(prod_id) - 1}",
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        text=buttons.add_basket,
+                        callback_data=f"add_basket_{int(prod_id)}",
+                    )
+                ],
+            ]
+        )
+
+        await callback.message.answer_photo(
+            photo=photo_file,
+            caption=card,
+            parse_mode="HTML",
+            reply_markup=keyboard,
+        )
+        await callback.answer()
 
 
 products_tg_service = ProductsService(db_manager, ProductsOrm)
