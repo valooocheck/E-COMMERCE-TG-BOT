@@ -7,6 +7,7 @@ load_dotenv()
 
 class TelegramBotConfig(BaseSettings):
     token: SecretStr = Field(description="Telegram bot token")
+    debug: bool = Field(description="ORM logs, Swagger show", default=False)
 
     model_config = SettingsConfigDict(env_prefix="TELEGRAM_BOT_", env_file_encoding="utf-8")
 
