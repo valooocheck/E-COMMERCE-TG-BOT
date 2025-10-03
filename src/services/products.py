@@ -95,7 +95,6 @@ class ProductsService(BaseService):
     @staticmethod
     async def gen_product_card(name: str, description: str, price: int, category_id: int, quantity: int):
         category = await categories_tg_service._get_by_id(category_id)
-        # return f"Название товара: {name} \nЦена: {price}₽ \nОписание: {description}\nКатегория: {category.name}\nКоличество: {quantity}"
         return CARD_TEMPLATE % (str(name), str(price), str(description), str(category.name), str(quantity))
 
     async def confirmation_add(self, message: types.Message, state: FSMContext):

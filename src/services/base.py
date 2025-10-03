@@ -79,6 +79,7 @@ class BaseService:
         if not record:
             await callback.message.answer(RECORD_NOT_FOUND)
             await callback.answer()
+            return
 
         await state.update_data(**{name_state: record.id})
         return record
