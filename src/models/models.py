@@ -73,7 +73,7 @@ class UsersOrm(BaseMixin):
     __tablename__ = "users"
 
     tg_id: Mapped[int] = mapped_column(unique=True)
-    tg_username: Mapped[str]
+    tg_username: Mapped[str] = mapped_column(nullable=True)
     is_admin: Mapped[bool] = mapped_column(default=False, server_default=text("false"))
     name: Mapped[str] = mapped_column(nullable=True)
     phone_number: Mapped[str] = mapped_column(nullable=True)
@@ -81,8 +81,6 @@ class UsersOrm(BaseMixin):
     cart: Mapped[List["CartOrm"]] = relationship(back_populates="user")
     orders: Mapped[List["OrdersOrm"]] = relationship(back_populates="user")
     addresses: Mapped[List["AddressesOrm"]] = relationship(back_populates="user", cascade="all, delete-orphan")
-
-    __table_args__ = (UniqueConstraint("tg_id", "tg_username", name="uq_tg_id_tg_username"),)
 
     @classmethod
     async def update_by_tg_username(cls, db_manager, tg_username, **kwargs):
